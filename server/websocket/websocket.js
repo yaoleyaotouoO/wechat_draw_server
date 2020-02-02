@@ -1,8 +1,7 @@
 const ws = require('ws');
 const webSocketSend = require('./send');
-const webSocketController = require('../controllers/websocket');
-const apiController = require('../controllers/api');
-const userCache = require('../caches/userCache');
+const OfflineUserCache = require('../caches/offlineUserCache');
+const moment = require('moment');
 
 const WebSocketServer = ws.Server;
 
@@ -23,60 +22,21 @@ class WebSocketConnection {
 
         ws.on('message', (message) => {
             const messageData = JSON.parse(message);
-            if (messageData.type === 'setWebSocketUserId') {
-                this.userId = messageData.data.userId;
-                this.userName = messageData.data.userName;
-                let roomId = messageData.data.roomId;
-                if (roomId) {
-                    message = JSON.stringify({
-                        data: {
-                            userId: this.userId,
-                            userName: this.userName,
-                            roomId
-                        },
-                        type: 'changedRoomUser'
-                    });
-                    webSocketSend(wss, ws, message);
-                }
-
-                webSocketController.setRoomUserAtive({ isActive: 1, id: this.userId });
-                userCache.set(this.userId, { ws });
-                return;
-            }
-
-            webSocketSend(wss, ws, message);
+            webSocketSend(wss, ws, messageData);
         });
 
         ws.on('error', (err) => {
             console.log(`errored: ${err}`);
         });
 
-        ws.on('close', (event) => {
-            if (!this.userId) {
+        ws.on('close', (event, data) => {
+            if (!data) {
+                console.error('ws on close error!');
                 return;
             }
-            userCache.delete(this.userId);
-
-            // 解决刷新会删除用户信息问题
-            setTimeout(async () => {
-                if (userCache.get(this.userId)) {
-                    return;
-                }
-
-                let roomId = await apiController.getRoomIdByUserId({ userId: this.userId });
-                await webSocketController.setRoomUserAtive({ isActive: 0, id: this.userId });
-                await apiController.deleteRoomUserByUserId({ userId: this.userId, roomId });
-                let userList = await apiController.getRoomUserListByRoomId({ roomId });
-                let message = JSON.stringify({
-                    data: {
-                        userId: this.userId,
-                        roomId,
-                        userList
-                    },
-                    type: 'reloadRoomUser'
-                });
-                webSocketSend(wss, ws, message);
-            }, 5 * 1000);
+            const message = JSON.parse(data);
+            const { userId } = message;
+            OfflineUserCache.set(userId, { id: userId, offlineTime: moment().format('MM/DD/YYYY HH:mm:ss') });
         });
     }
 }

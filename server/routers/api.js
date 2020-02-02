@@ -14,53 +14,18 @@ const successResponse = (data) => {
 }
 
 apiRouter
-    .get('/getUserInfo', async (ctx) => {
-        const data = await apiController.getUserInfo();
-        ctx.body = successResponse(data);
+    .post('/addUserInfo', async ctx => {
+        const data = await apiController.addUserInfo(ctx.request.body);
+        ctx.body = data;
     })
-    .post('/login', async (ctx) => {
-        const data = await apiController.login(ctx.request.body);
-        ctx.body = successResponse(data);
+    .post('/createRoom', async ctx => {
+        const data = await apiController.createRoom(ctx.request.body);
+        ctx.body = data;
     })
-    .post('/register', async (ctx) => {
-        const data = await apiController.register(ctx.request.body);
-        ctx.body = successResponse(data);
+    .post('/findRoom', async ctx => {
+        const data = await apiController.findRoom(ctx.request.body);
+        ctx.body = data;
     })
-    .get('/getRoomList', async (ctx) => {
-        const data = await apiController.getRoomList();
-        ctx.body = successResponse(data);
-    })
-    .get('/:roomId/getRoomUserListByRoomId', async (ctx) => {
-        const data = await apiController.getRoomUserListByRoomId(ctx.params);
-        ctx.body = successResponse(data);
-    })
-    .get('/:userId/getRoomIdByUserId', async (ctx) => {
-        const data = await apiController.getRoomIdByUserId(ctx.params);
-        ctx.body = successResponse(data);
-    })
-    .post('/createRoom', async (ctx) => {
-        let createRoomData = {
-            roomName: ctx.request.body.roomName,
-            createTime: moment().format('YYYY-MM-DD HH:mm:ss'),
-            status: 1,
-            type: enums.RoomTypeEnum.PublicRoom
-        }
-
-        const data = await apiController.createRoom(createRoomData);
-        ctx.body = successResponse(data);
-    })
-    .get('/findRoom', async (ctx) => {
-        let { roomName } = ctx.request.query;
-        const data = await apiController.findRoom({ roomName });
-        ctx.body = successResponse(data);
-    })
-    .post('/deleteRoomUserByUserId', async (ctx) => {
-        const data = await apiController.deleteRoomUserByUserId(ctx.request.body);
-        ctx.body = successResponse(data);
-    })
-    .post('/updateRoomUserStatusByUserId', async (ctx) => {
-        const data = await apiController.updateRoomUserStatusByUserId(ctx.request.body);
-        ctx.body = successResponse(data);
-    })
+   
 
 module.exports = apiRouter;

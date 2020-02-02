@@ -1,57 +1,55 @@
-const roomUserCache = require('../caches/roomUserCache');
 const { broadcast } = require('../common/websocketUtil');
-const apiController = require('../controllers/api');
-const userCache = require('../caches/userCache');
-
+const RoomCache = require('../caches/roomCache');
+const UserCache = require('../caches/userCache');
+const webSocketController = require('../controllers/websocket');
 
 class CheckAnswerContext {
-    constructor(wss, { roomId, drawAnswer, userId, userName }) {
+    constructor(wss, { roomId, answer, userId }) {
         this.wss = wss;
         this.roomId = roomId;
-        this.drawAnswer = drawAnswer;
+        this.answer = answer;
         this.userId = userId;
-        this.userName = userName;
-        this.roomUserCache = {};
+        this.userName = UserCache.get(userId).nickName;
+        this.roomCache = {};
 
         this.checkAnswer();
     }
 
     async checkAnswer() {
-        this.roomUserCache = roomUserCache.get(this.roomId);
-        let chatMessage = '';
-        if (this.roomUserCache.topicName === this.drawAnswer) {
+        this.roomCache = RoomCache.get(this.roomId);
+        let message = '';
+        if (this.roomCache.topicName === this.answer) {
             // TODO 记录答对的人和第几次答对
             await this.recordCorrectAnswerInfo();
 
             // TODO 重新获取一下用户数据, 为了拿最新的分数 
-            let roomUserScoreList = await apiController.getRoomUserListByRoomId({ roomId: this.roomId });
+            const userList = webSocketController.getRoomUserByRoomId(this.roomId, false);
             broadcast(this.wss, JSON.stringify({
-                data: { roomId: this.roomId, roomUserScoreList },
-                type: 'showRoomUserScore'
+                data: { roomId: this.roomId, userList },
+                type: 'updateRoomUser'
             }));
 
-            chatMessage = `${this.userName}: 答对了!`;
+            message = `${this.userName}: 答对了!`;
         } else {
-            chatMessage = `${this.userName}: ${this.drawAnswer}`;
+            message = `${this.userName}: ${this.answer}`;
         }
 
         broadcast(this.wss, JSON.stringify({
-            data: { roomId: this.roomId, chatMessage, showChatMessage: true },
-            type: 'showChatMessage'
+            data: { roomId: this.roomId, message },
+            type: 'updateMessage'
         }));
     }
 
     async recordCorrectAnswerInfo() {
-        let userInfo = userCache.get(this.userId);
+        let userInfo = UserCache.get(this.userId);
         // 已经答对过了
         if (userInfo.isBingo) {
             return;
         }
-        userCache.set(this.userId, Object.assign({}, userInfo, { isBingo: true }));
+        UserCache.set(this.userId, { isBingo: true });
 
         // 答对题的人数
-        console.log("this.roomUserCache: ", this.roomUserCache);
-        let answerNumber = this.roomUserCache.answerNumber || 0;
+        let answerNumber = this.roomCache.answerNumber || 0;
         answerNumber = ++answerNumber;
         let score = 0;
         if (answerNumber === 1) {
@@ -62,8 +60,8 @@ class CheckAnswerContext {
             score = 1;
         }
 
-        await apiController.updateRoomUserScoreByUserId({ score, roomId: this.roomId, userId: this.userId });
-        roomUserCache.set(this.roomId, Object.assign({}, this.roomUserCache, { answerNumber }));
+        UserCache.set(this.userId, { score });
+        RoomCache.set(this.roomId, { answerNumber });
     }
 }
 

@@ -14,8 +14,25 @@ let RoomUserStatusEnum = {
     InTheGame: 2
 }
 
+let RoomStatus = {
+    Ready: 1,
+    Running: 2
+}
+
+let UserStatus = {
+    Offline: 0,
+    Ready: 1,
+    InTheGame: 2
+}
+
+let TopicType = {
+    
+}
+
 module.exports = {
     RoomStatusEnum,
     RoomTypeEnum,
-    RoomUserStatusEnum
+    RoomUserStatusEnum,
+    RoomStatus,
+    UserStatus
 }
