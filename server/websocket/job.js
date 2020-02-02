@@ -1,24 +1,26 @@
-const apiController = require('../controllers/api');
-const userCache = require('../caches/userCache');
+const OfflineUserCache = require('../caches/offlineUserCache');
+const UserCache = require('../caches/userCache');
+const moment = require('moment');
 
-let serviceStartDeleteExpiredRoomUser = async () => {
-    let roomIdList = await apiController.getAllRoomIdList();
-    for (let i = 0; i < roomIdList.length; i++) {
-        let roomId = roomIdList[i].Id;
-        let userIds = await apiController.getUserIdListByroomId({ roomId });
-        let needDelUserIds = [];
+const serviceStartDeleteExpiredUser = async () => {
+    const userCache = OfflineUserCache.getAll();
+    const userList = Object.values(userCache);
+    const currentTime = moment();
 
-        userIds.map(x => {
-            if (!userCache.get(x.userId)) {
-                needDelUserIds.push(x.userId);
-            }
-        });
-
-        let delData = await apiController.deleteRoomUserByUserId({ userId: needDelUserIds, roomId });
+    for (let i = 0; i < userList.length; i++) {
+        const item = userList[i];
+        // 判断用户是否 5 分钟内都没有重新进入游戏
+        const isExpires = currentTime.diff(moment(item.offlineTime), 'seconds') > 60 * 5;
+        isExpires && UserCache.delete(item.id);
     }
 }
 
+const startJob = () => {
+    setInterval(() => {
+        serviceStartDeleteExpiredUser();
+    }, 1000 * 60 * 2);
+}
 
 module.exports = () => {
- //   serviceStartDeleteExpiredRoomUser()
+    startJob
 }

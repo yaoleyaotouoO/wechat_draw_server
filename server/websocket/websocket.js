@@ -36,7 +36,7 @@ class WebSocketConnection {
             }
             const message = JSON.parse(data);
             const { userId } = message;
-            OfflineUserCache.set(userId, { id: userId, offlineTime: moment().format('MM/DD/YYYY HH:mm:ss') });
+            OfflineUserCache.set(userId, { id: userId, offlineTime: moment() });
         });
     }
 }

@@ -2,7 +2,7 @@ const Koa = require('koa');
 const KoaBody = require('koa-body');
 const apiRouter = require('./routers/api');
 const createWebSocket = require('./websocket/websocket');
-const createJob = require('./websocket/job');
+const startJob = require('./websocket/job');
 const cors = require('koa2-cors');
 
 const app = new Koa();
@@ -26,7 +26,7 @@ let server = app.listen(PORT, HOST, () => {
     console.log(`server is listening on ${HOST}:${PORT}`);
 });
 
-createJob();
+startJob();
 
 createWebSocket(server);
 

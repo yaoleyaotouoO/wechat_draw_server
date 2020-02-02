@@ -7,10 +7,13 @@ module.exports = async (wss, ws, message) => {
             break;
         case 'startGame':
             webSocketController.startGame(wss, ws, message.data);
+            break;
         case 'submitAnswer':
             webSocketController.submitAnswer(wss, ws, message.data);
+            break;
         case 'updateCanvas':
             webSocketController.updateCanvas(wss, ws, message.data);
+            break;
         default:
             console.warn('websocket not send message type');
     }
