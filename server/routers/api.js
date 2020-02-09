@@ -3,7 +3,7 @@ const apiController = require('../controllers/api');
 const enums = require('../common/enums');
 const moment = require('moment');
 
-const apiRouter = new Router({ prefix: '/api' });
+const apiRouter = new Router({ prefix: '/wechatapi' });
 
 
 const successResponse = (data) => {

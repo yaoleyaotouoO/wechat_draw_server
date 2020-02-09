@@ -1,10 +1,11 @@
 const { broadcast } = require('../common/websocketUtil');
 const RoomCache = require('../caches/roomCache');
 const UserCache = require('../caches/userCache');
-const webSocketController = require('../controllers/websocket');
+const { uuid } = require('uuidv4');
 
 class CheckAnswerContext {
-    constructor(wss, { roomId, answer, userId }) {
+    constructor(webSocketController, wss, { roomId, answer, userId }) {
+        this.webSocketController = webSocketController;
         this.wss = wss;
         this.roomId = roomId;
         this.answer = answer;
@@ -18,24 +19,25 @@ class CheckAnswerContext {
     async checkAnswer() {
         this.roomCache = RoomCache.get(this.roomId);
         let message = '';
+
         if (this.roomCache.topicName === this.answer) {
             // TODO 记录答对的人和第几次答对
             await this.recordCorrectAnswerInfo();
 
             // TODO 重新获取一下用户数据, 为了拿最新的分数 
-            const userList = webSocketController.getRoomUserByRoomId(this.roomId, false);
+            const userList = this.webSocketController.getRoomUserByRoomId(this.roomId, false);
             broadcast(this.wss, JSON.stringify({
                 data: { roomId: this.roomId, userList },
                 type: 'updateRoomUser'
             }));
 
-            message = `${this.userName}: 答对了!`;
+            message = `答对了!`;
         } else {
-            message = `${this.userName}: ${this.answer}`;
+            message = this.answer;
         }
 
         broadcast(this.wss, JSON.stringify({
-            data: { roomId: this.roomId, message },
+            data: { roomId: this.roomId, message: { id: uuid(), author: this.userName, message } },
             type: 'updateMessage'
         }));
     }

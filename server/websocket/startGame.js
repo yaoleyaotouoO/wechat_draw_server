@@ -1,13 +1,14 @@
 const RoomCache = require('../caches/roomCache');
 const UserCache = require('../caches/userCache');
-const webSocketController = require('../controllers/websocket');
 const { broadcast } = require('../common/websocketUtil');
+const { RoomStatus } = require('../common/enums');
 
 const OneRoundTime = 100;
 const RefreshUserTime = 10;
 
 class StartGameContext {
-    constructor(wss, roomId, userId) {
+    constructor(webSocketController, wss, roomId, userId) {
+        this.webSocketController = webSocketController;
         this.wss = wss;
         this.roomId = roomId;
         this.topicName = '';
@@ -23,18 +24,19 @@ class StartGameContext {
     }
 
     async initGame() {
-        RoomCache.set(roomId, { status: RoomStatus.Running });
+        RoomCache.set(this.roomId, { status: RoomStatus.Running });
         broadcast(this.wss, JSON.stringify({
             data: { roomId: this.roomId, drawUserId: this.drawUserId },
             type: 'startGame'
         }));
 
+        this.everyRoundOfTheGameStartCheckingUsers();
         await this.getTopic();
         this.startTheGame();
     }
 
     async getTopic() {
-        let topicDataList = await webSocketController.getRandomTopic();
+        let topicDataList = await this.webSocketController.getRandomTopic();
         let topicData = topicDataList[0];
         this.topicName = topicData.name;
         this.topicPrompt = topicData.prompt;
@@ -45,9 +47,8 @@ class StartGameContext {
 
     startTheGame() {
         this.gamePollTag = setInterval(async () => {
-            let isGameOver = await this.gameOverDisplayScore();
-            if (isGameOver) {
-                return;
+            if (!this.gameTime && ((this.gameRound + 1) === this.gameTotalRound)) {
+                await this.gameOverDisplayScore();
             }
 
             if (!this.gameTime) {
@@ -59,8 +60,22 @@ class StartGameContext {
             }
 
             this.sendMessageToUser();
+            this.judgeAllUserCorrect();
+
             this.gameTime--;
         }, 1000);
+    }
+
+    async judgeAllUserCorrect() {
+        this.userList = this.webSocketController.getRoomUserByRoomId(this.roomId, false);
+        const filterUserList = this.userList.filter(item => item.id !== this.drawUserId);
+        const isEveryBingo = filterUserList.every(item => item.isBingo);
+        if (isEveryBingo && (this.gameRound + 1) === this.gameTotalRound) {
+            await this.gameOverDisplayScore();
+        }
+        if (isEveryBingo) {
+            await this.showAnswersEveryRoundOfGame();
+        }
     }
 
     sendMessageToUser() {
@@ -73,49 +88,54 @@ class StartGameContext {
 
         RoomCache.set(this.roomId, gameInfo);
         const roomData = RoomCache.get(this.roomId);
-
         broadcast(this.wss, JSON.stringify({
             data: {
                 roomData,
                 roomId: this.roomId,
-                gameTime: this.gameTime,
+                gameTime: this.gameTime
             },
             type: 'updateGameInfo'
         }));
     }
 
     async gameOverDisplayScore() {
-        if (!this.gameTime && ((this.gameRound + 1) === this.gameTotalRound)) {
-            RoomCache.set(roomId, { status: RoomStatus.Ready });
-            let gameOverScoreList = webSocketController.getRoomUserByRoomId(this.roomId, false);
-            gameOverScoreList = gameOverScoreList.sort((a, b) => a.score < b.score);
-            // TODO 游戏结束统计分数
-            broadcast(this.wss, JSON.stringify({
-                data: { roomId: this.roomId, userList: gameOverScoreList },
-                type: 'gameOver'
-            }));
+        RoomCache.set(this.roomId, { status: RoomStatus.Ready });
+        let gameOverScoreList = this.webSocketController.getRoomUserByRoomId(this.roomId);
+        gameOverScoreList = gameOverScoreList.sort((a, b) => a.score < b.score);
 
-            // 清空分数
-            gameOverScoreList.map(item => {
-                UserCache.set(item.id, { score: 0 });
-            });
+        // TODO 游戏结束统计分数
+        broadcast(this.wss, JSON.stringify({
+            data: {
+                roomId: this.roomId,
+                userList: gameOverScoreList
+            },
+            type: 'gameOver'
+        }));
 
-            clearInterval(this.gamePollTag);
+        // 清空分数
+        gameOverScoreList.map(item => {
+            UserCache.set(item.id, { score: 0 });
+        });
 
-            return true;
-        }
+        clearInterval(this.gamePollTag);
 
-        return false;
+        return true;
     }
 
     getDrawUserId() {
-        // 获取第一轮画图的用户
-        if (this.gameRound === 0) {
-            this.drawUserId = this.userList[0].userId;
+        if ((this.gameRound + 1) > this.gameTotalRound) {
             return;
         }
 
-        this.drawUserId = this.userList[this.gameRound].userId;
+        // 获取第一轮画图的用户
+        if (this.gameRound === 0) {
+            this.drawUserId = this.userList[0].id;
+            RoomCache.set(this.roomId, { drawUserId: this.drawUserId });
+            return;
+        }
+
+        this.drawUserId = this.userList[this.gameRound].id;
+        RoomCache.set(this.roomId, { drawUserId: this.drawUserId });
     }
 
     async showAnswersEveryRoundOfGame() {
@@ -136,18 +156,17 @@ class StartGameContext {
         RoomCache.set(this.roomId, { answerNumber: 0 });
 
         // 每轮开始的时候，都重置这个房间用户答对题目的 Flag
-        const userList = webSocketController.getRoomUserByRoomId(this.roomId, false);
+        const userList = this.webSocketController.getRoomUserByRoomId(this.roomId, false);
         userList.map(item => {
             UserCache.set(item.id, { isBingo: false });
         });
         // 刷新用户
-        this.userList = webSocketController.getRoomUserByRoomId(this.roomId, false);
+        this.userList = this.webSocketController.getRoomUserByRoomId(this.roomId, false);
     }
 
     // 定时查一下最新用户列表，看是否有用户离线了
     async everyRoundOfTheGameStartCheckingUsers() {
-        this.userList = webSocketController.getRoomUserByRoomId(this.roomId, false);
-
+        this.userList = this.webSocketController.getRoomUserByRoomId(this.roomId, false);
         // 根据用户数，确定游戏轮数
         this.gameTotalRound = this.userList.length;
         this.getDrawUserId();

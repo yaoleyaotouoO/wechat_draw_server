@@ -1,7 +1,6 @@
 const { sqlQuery } = require('../db/db');
 const RoomCache = require('../caches/roomCache');
 const UserCache = require('../caches/userCache');
-const moment = require('moment');
 const { RoomStatus } = require('../common/enums');
 const { broadcast } = require('../common/websocketUtil');
 const _ = require('lodash');
@@ -45,6 +44,22 @@ module.exports = {
                 },
                 type: 'joinRoomFail'
             }));
+            return;
+        }
+
+        UserCache.set(userId, { ...user, ...{ ws } });
+        const userList = this.getRoomUserByRoomId(roomId);
+        const findUser = userList.find(item => item.id === userId);
+        if (findUser) {
+            // 广播更新用户
+            broadcast(wss, JSON.stringify({
+                data: {
+                    roomId,
+                    userList
+                },
+                type: 'updateRoomUser'
+            }));
+
             return;
         }
 
@@ -93,7 +108,7 @@ module.exports = {
     async startGame(wss, ws, data) {
         const { roomId, userId } = data;
 
-        new StartGameContext(wss, roomId, userId);
+        new StartGameContext(this, wss, roomId, userId);
     },
     /**
      data:
@@ -104,7 +119,7 @@ module.exports = {
      }
    **/
     async submitAnswer(wss, ws, data) {
-        new CheckAnswerContext(wss, data);
+        new CheckAnswerContext(this, wss, data);
     },
     /**
     data:
@@ -120,10 +135,10 @@ module.exports = {
         broadcast(wss, JSON.stringify({
             data,
             type: 'updateCanvas'
-        }));
+        }), ws);
     },
     async getRandomTopic() {
-        let sql = `SELECT count(*) count FROM draw_topic`;
+        let sql = `SELECT count(*) count FROM topic`;
         let topicCount = await sqlQuery(sql);
         let randomCount = parseInt(Math.random() * topicCount[0].count + 1);
 
