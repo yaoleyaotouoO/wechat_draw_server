@@ -26,7 +26,7 @@ apiRouter
         const data = await apiController.findRoom(ctx.request.body);
         ctx.body = data;
     })
-    .get('test', ctx => {
+    .get('/test', ctx => {
         ctx.body = 'nginx test';
     })
 
