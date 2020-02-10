@@ -143,10 +143,15 @@ class StartGameContext {
         console.log(`第 ${this.gameRound + 1} 轮游戏`);
 
         // 通知前端弹窗显示答案
+        // broadcast(this.wss, JSON.stringify({
+        //     data: { roomId: this.roomId, topicName: this.topicName, drawUserId: this.drawUserId },
+        //     type: 'showAnswer'
+        // }), UserCache.get(this.drawUserId).ws);
+
         broadcast(this.wss, JSON.stringify({
-            data: { roomId: this.roomId, topicName: this.topicName, drawUserId: this.drawUserId },
-            type: 'showAnswer'
-        }), UserCache.get(this.drawUserId).ws);
+            data: { roomId: this.roomId, message: { id: uuid(), author: '答案', message: this.topicName } },
+            type: 'updateMessage'
+        }));
 
         // 下一个人画, 重新计时重新出题
         await this.getTopic();
