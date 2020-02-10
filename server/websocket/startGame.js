@@ -144,7 +144,7 @@ class StartGameContext {
 
         // 通知前端弹窗显示答案
         broadcast(this.wss, JSON.stringify({
-            data: { roomId: this.roomId, topicName: this.topicName },
+            data: { roomId: this.roomId, topicName: this.topicName, drawUserId: this.drawUserId },
             type: 'showAnswer'
         }), UserCache.get(this.drawUserId).ws);
 
