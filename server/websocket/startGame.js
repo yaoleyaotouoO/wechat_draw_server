@@ -2,6 +2,7 @@ const RoomCache = require('../caches/roomCache');
 const UserCache = require('../caches/userCache');
 const { broadcast } = require('../common/websocketUtil');
 const { RoomStatus } = require('../common/enums');
+const { uuid } = require('uuidv4');
 
 const OneRoundTime = 100;
 const RefreshUserTime = 10;
@@ -49,6 +50,7 @@ class StartGameContext {
         this.gamePollTag = setInterval(async () => {
             if (!this.gameTime && ((this.gameRound + 1) === this.gameTotalRound)) {
                 await this.gameOverDisplayScore();
+                return;
             }
 
             if (!this.gameTime) {
@@ -143,11 +145,6 @@ class StartGameContext {
         console.log(`第 ${this.gameRound + 1} 轮游戏`);
 
         // 通知前端弹窗显示答案
-        // broadcast(this.wss, JSON.stringify({
-        //     data: { roomId: this.roomId, topicName: this.topicName, drawUserId: this.drawUserId },
-        //     type: 'showAnswer'
-        // }), UserCache.get(this.drawUserId).ws);
-
         broadcast(this.wss, JSON.stringify({
             data: { roomId: this.roomId, message: { id: uuid(), author: '答案', message: this.topicName } },
             type: 'updateMessage'

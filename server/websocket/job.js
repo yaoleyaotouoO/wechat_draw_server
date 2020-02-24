@@ -1,5 +1,6 @@
 const OfflineUserCache = require('../caches/offlineUserCache');
 const UserCache = require('../caches/userCache');
+const RoomCache = require('../caches/roomCache');
 const moment = require('moment');
 
 const serviceStartDeleteExpiredUser = async () => {
@@ -9,17 +10,32 @@ const serviceStartDeleteExpiredUser = async () => {
 
     for (let i = 0; i < userList.length; i++) {
         const item = userList[i];
-        // 判断用户是否 5 分钟内都没有重新进入游戏
-        const isExpires = currentTime.diff(moment(item.offlineTime), 'seconds') > 60 * 5;
+        // 判断用户是否 30 秒内都没有重新进入游戏
+        const isExpires = currentTime.diff(moment(item.offlineTime), 'seconds') > 30;
         isExpires && UserCache.delete(item.id);
     }
 }
 
-const startJob = () => {
-    setInterval(() => {
-        serviceStartDeleteExpiredUser();
-    }, 1000 * 60 * 2);
+const serviceStartDeleteExpiredRoom = async () => {
+    const roomCache = RoomCache.getAll();
+    const roomList = Object.values(roomCache);
+
+    for (let i = 0; i < roomList.length; i++) {
+        const room = roomList[i];
+
+        const userList = UserCache.getAll();
+        const roomUser = Object.values(userList)
+            .filter(x => x.roomId === room.roomId);
+
+        !roomUser.length && RoomCache.delete(room.roomId);
+    }
 }
+
+const startJob = setInterval(() => {
+    // serviceStartDeleteExpiredUser();
+    serviceStartDeleteExpiredRoom();
+}, 1000 * 10);
+
 
 module.exports = () => {
     startJob

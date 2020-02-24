@@ -1,6 +1,7 @@
 const ws = require('ws');
 const webSocketSend = require('./send');
 const OfflineUserCache = require('../caches/offlineUserCache');
+const UserCache = require('../caches/userCache');
 const moment = require('moment');
 
 const WebSocketServer = ws.Server;
@@ -30,12 +31,15 @@ class WebSocketConnection {
         });
 
         ws.on('close', (event, data) => {
-            if (!data) {
+            console.log("close data: ", data);
+            if (data.indexOf('userId') === -1) {
                 console.error('ws on close error!');
                 return;
             }
+            
             const message = JSON.parse(data);
             const { userId } = message;
+            UserCache.delete(userId);
             OfflineUserCache.set(userId, { id: userId, offlineTime: moment() });
         });
     }
